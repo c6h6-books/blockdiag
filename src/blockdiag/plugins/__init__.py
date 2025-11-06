@@ -13,8 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from pkg_resources import iter_entry_points
-
+from importlib.metadata import entry_points
 from blockdiag.utils.logging import warning
 
 loaded_plugins = []
@@ -23,21 +22,31 @@ general_handlers = {}
 
 
 def load(plugins, diagram, **kwargs):
+    # Retrieve all available entry points for the 'blockdiag_plugins' group
+    all_plugin_eps = entry_points().select(group='blockdiag_plugins')
+
     for name in plugins:
         if name in loaded_plugins:
             warning('plugin "%s" is already loaded. ignored.', name)
             return
 
-        for ep in iter_entry_points('blockdiag_plugins', name):
-            module = ep.load()
-            loaded_plugins.append(name)
-            if hasattr(module, 'setup'):
-                module.setup(module, diagram, **kwargs)
-            break
+        # Find the specific entry point by name
+        ep = next((p for p in all_plugin_eps if p.name == name), None)
+
+        if ep:
+            try:
+                module = ep.load()
+                loaded_plugins.append(name)
+                if hasattr(module, 'setup'):
+                    module.setup(module, diagram, **kwargs)
+                # break is implicit here since we only grab one ep
+            except Exception as e:
+                # Handle potential loading errors if necessary
+                warning('Failed to load plugin "%s": %s', name, e)
         else:
+            # Replicates the behavior of the original for...else block
             msg = "unknown plugin: %s" % name
             raise AttributeError(msg)
-
 
 def install_general_handler(name, handler):
     if name not in general_handlers:

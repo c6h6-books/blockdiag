@@ -15,17 +15,29 @@
 
 from __future__ import division
 
-import pkg_resources
+from importlib.metadata import entry_points
 
 renderers = {}
 searchpath = []
 
 
 def init_renderers():
-    for plugin in pkg_resources.iter_entry_points('blockdiag_noderenderer'):
-        module = plugin.load()
-        if hasattr(module, 'setup'):
-            module.setup(module)
+    # Use entry_points to get plugins for the specified group
+    # For Python 3.10+, entry_points() is indexed like a dictionary
+
+    # We use .select() for broader compatibility across Python 3.8+ versions
+    plugins = entry_points().select(group='blockdiag_noderenderer')
+
+    for plugin in plugins:
+        try:
+            # EntryPoint objects have a .load() method similar to pkg_resources
+            module = plugin.load()
+            if hasattr(module, 'setup'):
+                module.setup(module)
+        except Exception as e:
+            # Handle potential loading errors if necessary
+            # For this example, we just pass or log the error
+            print(f"Warning: Failed to load noderenderer plugin {plugin.name}: {e}")
 
 
 def install_renderer(name, renderer):

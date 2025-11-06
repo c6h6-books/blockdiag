@@ -13,7 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import pkg_resources
+from importlib.metadata import entry_points
 
 from blockdiag.utils.logging import warning
 
@@ -21,14 +21,23 @@ drawers = {}
 
 
 def init_imagedrawers(debug=False):
-    for drawer in pkg_resources.iter_entry_points('blockdiag_imagedrawers'):
+    try:
+        # In Python 3.10+, entry_points() returns an EntryPoints object
+        # that can be indexed like a dictionary.
+        group_entry_points = entry_points(group='blockdiag_imagedrawers')
+    except TypeError:
+        # For compatibility with older importlib_metadata, we'll try the
+        # fallback below which uses a list/iterable.
+        group_entry_points = entry_points().select(group='blockdiag_imagedrawers')
+
+    for drawer in group_entry_points:
         try:
             module = drawer.load()
             if hasattr(module, 'setup'):
                 module.setup(module)
         except Exception as exc:
             if debug:
-                warning('Failed to load %s: %r' % (drawer.module_name, exc))
+                warning('Failed to load %s: %r' % (drawer.name, exc))
 
 
 def install_imagedrawer(ext, drawer):
